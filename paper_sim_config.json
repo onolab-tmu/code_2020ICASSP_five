@@ -1,0 +1,123 @@
+{
+  "name" : "five_sim",
+
+  "n_repeat" : 100,
+  "seed" : 12345,
+  "n_targets_list" : [1],
+  "n_interferers_list" : [1, 2, 5, 10],
+  "n_mics_list" : [2,3,5,8],
+  "sinr_list" : [-5, 0, 5, 10],
+  "sinr_diffuse_ratio" : 0.99,
+  "samples_list" : "./samples/metadata.json",
+  "ref_mic" : 0,
+  "dir" : "data",
+
+  "room_params": {
+    "mic_delta": 0.02,
+    "fs": 16000,
+    "t60_interval": [0.150, 0.350],
+    "room_width_interval": [6, 10],
+    "room_height_interval": [2.8, 4.5],
+    "source_zone_height": [1.0, 2.0],
+    "guard_zone_width": 0.5
+  },
+
+  "stft_params" : {
+    "framesize" : 4096,
+    "hop" : 2048,
+    "window": "hamming"
+  },
+
+  "algorithm_kwargs" : {
+    "five_laplace" : {
+      "algo" : "five",
+      "kwargs" : {
+        "n_iter" : 50,
+        "model" : "laplace",
+        "callback_checkpoints" : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40]
+      }
+    },
+    "five_gauss" : {
+      "algo" : "five",
+      "kwargs" : {
+        "n_iter" : 50,
+        "model" : "gauss",
+        "callback_checkpoints" : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40]
+      }
+    },
+    "overiva_laplace" : {
+      "algo" : "overiva",
+      "kwargs" : {
+        "n_iter" : 50,
+        "init_eig" : false,
+        "model" : "laplace",
+        "callback_checkpoints" : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40]
+      }
+    },
+    "overiva_gauss" : {
+      "algo" : "overiva",
+      "kwargs" : {
+        "n_iter" : 50,
+        "init_eig" : false,
+        "model" : "gauss",
+        "callback_checkpoints" : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40]
+      }
+    },
+    "ogive_laplace" : {
+      "algo" : "ogive",
+      "kwargs" : {
+        "n_iter": 4000,
+        "step_size": 0.1,
+        "tol": 1e-3,
+        "update": "demix",
+        "model": "laplace",
+        "init_eig": false,
+        "callback_checkpoints" : [80, 160, 240, 320, 400, 480, 560, 640, 720, 800, 1600, 2400, 3200]
+      }
+    },
+    "ogive_gauss" : {
+      "algo" : "ogive",
+      "kwargs" : {
+        "n_iter": 4000,
+        "step_size": 0.1,
+        "tol": 1e-3,
+        "update": "demix",
+        "model": "gauss",
+        "init_eig": false,
+        "callback_checkpoints" : [80, 160, 240, 320, 400, 480, 560, 640, 720, 800, 1600, 2400, 3200]
+      }
+    },
+    "auxiva_laplace" : {
+      "algo" : "auxiva",
+      "kwargs" : {
+        "n_iter" : 50,
+        "model" : "laplace",
+        "callback_checkpoints" : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40]
+      }
+    },
+    "auxiva_gauss" : {
+      "algo" : "auxiva",
+      "kwargs" : {
+        "n_iter" : 50,
+        "model" : "gauss",
+        "callback_checkpoints" : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40]
+      }
+    },
+    "pca" : {
+      "algo" : "pca",
+      "kwargs" : { }
+    }
+  },
+
+  "overdet_algos" : [
+    "five_laplace",
+    "five_gauss",
+    "overiva_laplace",
+    "overiva_gauss",
+    "overiva2_laplace",
+    "overiva2_gauss",
+    "ogive_laplace",
+    "ogive_laplace_eig",
+    "pca"
+  ]
+}
