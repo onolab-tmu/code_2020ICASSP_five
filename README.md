@@ -4,7 +4,7 @@ Fast Independent Vector Extraction by Iterative SINR Maximization
 This repository provides implementations and code to reproduce the results
 of the paper
 
-> R. Scheibler and N. Ono, [*"Fast Independent Vector Extraction by Iterative SINR Maximization,"*](TBA) 2019.
+> R. Scheibler and N. Ono, [*"Fast Independent Vector Extraction by Iterative SINR Maximization,"*](http://arxiv.org/abs/1910.10654) 2019.
 
 Abstract
 --------
