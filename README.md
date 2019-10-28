@@ -56,7 +56,7 @@ script `example.py`. It can be run as follows.
     $ python ./example.py --help
     The samples directory ./samples seems to exist already. Delete if re-download is needed.
     usage: example.py [-h] [--no_cb] [-b BLOCK]
-                      [-a {auxiva,auxiva_pca,overiva,ilrma,five,ogive}]
+                      [-a {auxiva,auxiva_pca,overiva,five,ogive}]
                       [-d {laplace,gauss}] [-i {eye,eig,ogive}] [-m MICS]
                       [-s SRCS] [-n N_ITER] [--gui] [--save]
 
@@ -67,7 +67,7 @@ script `example.py`. It can be run as follows.
       --no_cb               Removes callback function
       -b BLOCK, --block BLOCK
                             STFT block size
-      -a {auxiva,auxiva_pca,overiva,ilrma,five,ogive}, --algo {auxiva,auxiva_pca,overiva,ilrma,five,ogive}
+      -a {auxiva,auxiva_pca,overiva,five,ogive}, --algo {auxiva,auxiva_pca,overiva,five,ogive}
                             Chooses BSS method to run
       -d {laplace,gauss}, --dist {laplace,gauss}
                             IVA model distribution
@@ -75,7 +75,6 @@ script `example.py`. It can be run as follows.
                             Initialization, eye: identity, eig: principal
                             eigenvectors
       -m MICS, --mics MICS  Number of mics
-      -s SRCS, --srcs SRCS  Number of sources
       -n N_ITER, --n_iter N_ITER
                             Number of iterations
       --gui                 Creates a small GUI for easy playback of the sound

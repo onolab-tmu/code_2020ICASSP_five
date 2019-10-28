@@ -50,14 +50,7 @@ sys.path.append(samples_dir)
 # We concatenate a few samples to make them long enough
 if __name__ == "__main__":
 
-    algo_choices = [
-        "five",
-        "overiva",
-        "auxiva_pca",
-        "ogive",
-        "auxiva",
-        "ilrma",
-    ]
+    algo_choices = ["five", "overiva", "auxiva_pca", "ogive", "auxiva"]
     model_choices = ["laplace", "gauss"]
     init_choices = ["eye", "eig"]
 
@@ -95,9 +88,8 @@ if __name__ == "__main__":
         help="Initialization, eye: identity, eig: principal eigenvectors",
     )
     parser.add_argument("-m", "--mics", type=int, default=5, help="Number of mics")
-    parser.add_argument("-s", "--srcs", type=int, default=2, help="Number of sources")
     parser.add_argument(
-        "-n", "--n_iter", type=int, default=51, help="Number of iterations"
+        "-n", "--n_iter", type=int, default=11, help="Number of iterations"
     )
     parser.add_argument(
         "--gui",
@@ -110,8 +102,6 @@ if __name__ == "__main__":
         help="Saves the output of the separation to wav files",
     )
     args = parser.parse_args()
-
-    assert args.srcs <= args.mics, "More sources than microphones is not supported"
 
     if args.gui:
         print("setting tkagg backend")
@@ -128,7 +118,7 @@ if __name__ == "__main__":
     # absorption, max_order = 0.45, 12  # RT60 == 0.2
     n_sources = 10
     n_mics = args.mics
-    n_sources_target = args.srcs  # the determined case
+    n_sources_target = 1  # the single source case
     if args.algo.startswith("ogive") or args.algo == "five":
         print("IVE only works with a single source. Using only one source.")
         n_sources_target = 1
@@ -144,7 +134,7 @@ if __name__ == "__main__":
     source_std[0] /= np.sqrt(2.0)
 
     SINR = 5  # signal-to-interference-and-noise ratio
-    SINR_diffuse_ratio = 0.99  # ratio of uncorrelated to diffuse noise
+    SINR_diffuse_ratio = 0.9999  # ratio of uncorrelated to diffuse noise
 
     # STFT parameters
     framesize = 4096
@@ -232,6 +222,7 @@ if __name__ == "__main__":
         return mix
 
     # Run the simulation
+    # shape (n_sources, n_mics, n_samples)
     separate_recordings = room.simulate(
         callback_mix=callback_mix,
         callback_mix_kwargs=callback_mix_kwargs,
@@ -244,12 +235,10 @@ if __name__ == "__main__":
     # Monitor Convergence
     #####################
 
-    ref = np.moveaxis(separate_recordings, 1, 2)
-    if ref.shape[0] < n_mics:
-        ref = np.concatenate(
-            (ref, np.random.randn(n_mics - ref.shape[0], ref.shape[1], ref.shape[2])),
-            axis=0,
-        )
+    # reference is taken at microphone 0
+    ref = np.vstack(
+            [separate_recordings[0, :1], np.sum(separate_recordings[1:, :1], axis=0)]
+    )
 
     SDR, SIR, eval_time = [], [], []
 
@@ -268,17 +257,14 @@ if __name__ == "__main__":
             y = pra.transform.synthesis(Y[:, :, 0], framesize, hop, win=win_s)[:, None]
         else:
             y = pra.transform.synthesis(Y, framesize, hop, win=win_s)
-        y = y.astype(np.float64)
+        y = y[framesize - hop :, :].astype(np.float64)
 
         if args.algo != "blinkiva":
             new_ord = np.argsort(np.std(y, axis=0))[::-1]
             y = y[:, new_ord]
 
-        m = np.minimum(y.shape[0] - framesize + hop, ref.shape[1])
-        sdr, sir, sar, perm = bss_eval_sources(
-            ref[:n_sources_target, :m, 0],
-            y[framesize - hop : m + framesize - hop, :n_sources_target].T,
-        )
+        m = np.minimum(y.shape[0], ref.shape[1])
+        sdr, sir, sar, perm = bss_eval_sources(ref[:, :m], y[:m, [0, 0]].T)
         SDR.append(sdr)
         SIR.append(sir)
 
@@ -286,9 +272,9 @@ if __name__ == "__main__":
         eval_time.append(t_exit - t_enter)
 
     if args.algo.startswith("ogive"):
-        callback_checkpoints = list(range(0, ogive_iter, ogive_iter // n_iter))
+        callback_checkpoints = list(range(1, ogive_iter + ogive_iter // n_iter, ogive_iter // n_iter))
     else:
-        callback_checkpoints = list(range(0, n_iter))
+        callback_checkpoints = list(range(1, n_iter + 1))
     if args.no_cb:
         callback_checkpoints = []
 
@@ -302,6 +288,9 @@ if __name__ == "__main__":
     X_mics = X_all[:, :, :n_mics]
 
     tic = time.perf_counter()
+
+    # First evaluation of SDR/SIR
+    convergence_callback(X_mics[:, :, :1])
 
     # Run BSS
     if args.algo == "auxiva":
@@ -338,15 +327,6 @@ if __name__ == "__main__":
             callback=convergence_callback,
             callback_checkpoints=callback_checkpoints,
         )
-    elif args.algo == "ilrma":
-        # Run AuxIVA
-        Y = pra.bss.ilrma(
-            X_mics,
-            n_iter=n_iter,
-            n_components=2,
-            proj_back=False,
-            callback=convergence_callback,
-        )
     elif args.algo == "ogive":
         # Run OGIVE
         Y = ogive(
@@ -373,6 +353,9 @@ if __name__ == "__main__":
     else:
         raise ValueError("No such algorithm {}".format(args.algo))
 
+    # Last evaluation of SDR/SIR
+    convergence_callback(Y)
+
     # projection back
     z = projection_back(Y, X_mics[:, :, 0])
     Y *= np.conj(z[None, :, :])
@@ -381,55 +364,45 @@ if __name__ == "__main__":
 
     tot_eval_time = sum(eval_time)
 
-    print("Processing time: {} s".format(toc - tic - tot_eval_time))
-    print("Evaluation time: {} s".format(tot_eval_time))
+    print("Processing time: {:8.3f} s".format(toc - tic - tot_eval_time))
+    print("Evaluation time: {:8.3f} s".format(tot_eval_time))
 
     # Run iSTFT
     if Y.shape[2] == 1:
         y = pra.transform.synthesis(Y[:, :, 0], framesize, hop, win=win_s)[:, None]
     else:
         y = pra.transform.synthesis(Y, framesize, hop, win=win_s)
-    y = y.astype(np.float64)
+    y = y[framesize - hop :, :].astype(np.float64)
 
     if args.algo != "blinkiva":
         new_ord = np.argsort(np.std(y, axis=0))[::-1]
         y = y[:, new_ord]
 
-    # Compare SIR
-    #############
-    m = np.minimum(y.shape[0] - framesize + hop, ref.shape[1])
-    sdr, sir, sar, perm = bss_eval_sources(
-        ref[:n_sources_target, :m, 0],
-        y[framesize - hop : m + framesize - hop, :n_sources_target].T,
-    )
+    y_hat = y[:, :]
 
-    # reorder the vector of reconstructed signals
-    y_hat = y[:, perm]
-
-    print("SDR:", sdr)
-    print("SIR:", sir)
+    # Look at the result
+    SDR = np.array(SDR)
+    SIR = np.array(SIR)
+    print(f"SDR: In: {SDR[0, 0]:6.2f} dB -> Out: {SDR[-1, 0]:6.2f} dB")
+    print(f"SIR: In: {SIR[0, 0]:6.2f} dB -> Out: {SIR[-1, 0]:6.2f} dB")
 
     import matplotlib.pyplot as plt
 
     plt.figure()
 
-    for i in range(n_sources_target):
-        plt.subplot(2, n_sources_target, i + 1)
-        plt.specgram(ref[i, :, 0] + 1e-1, NFFT=1024, Fs=room.fs)
-        plt.title("Source {} (clean)".format(i))
+    plt.subplot(2, 1, 1)
+    plt.specgram(mics_signals[0], NFFT=1024, Fs=room.fs)
+    plt.title("Microphone 0 input")
 
-        plt.subplot(2, n_sources_target, i + n_sources_target + 1)
-        plt.specgram(y_hat[:, i], NFFT=1024, Fs=room.fs)
-        plt.title("Source {} (separated)".format(i))
+    plt.subplot(2, 1, 2)
+    plt.specgram(y_hat[:, 0], NFFT=1024, Fs=room.fs)
+    plt.title("Extracted source")
 
     plt.tight_layout(pad=0.5)
 
     plt.figure()
-    a = np.array(SDR)
-    b = np.array(SIR)
-    for i, (sdr, sir) in enumerate(zip(a.T, b.T)):
-        plt.plot(callback_checkpoints, sdr, label="SDR Source " + str(i), marker="*")
-        plt.plot(callback_checkpoints, sir, label="SIR Source " + str(i), marker="o")
+    plt.plot([0] + callback_checkpoints, SDR[:, 0], label="SDR", marker="*")
+    plt.plot([0] + callback_checkpoints, SIR[:, 0], label="SIR", marker="o")
     plt.legend()
     plt.tight_layout(pad=0.5)
 
@@ -458,6 +431,6 @@ if __name__ == "__main__":
         # Make a simple GUI to listen to the separated samples
         root = Tk()
         my_gui = PlaySoundGUI(
-            root, room.fs, mics_signals[0, :], y_hat.T, references=ref[:, :, 0]
+            root, room.fs, mics_signals[0, :], y_hat.T, references=ref[:1, :]
         )
         root.mainloop()

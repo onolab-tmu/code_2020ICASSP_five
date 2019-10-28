@@ -41,21 +41,17 @@ def pca_separation(X, n_src):
     """
     n_frames, n_freq, n_chan = X.shape
 
-    if n_src < n_chan:
-        # compute the cov mat (n_freq, n_chan, n_chan)
-        X_ = np.transpose(X, [1, 2, 0])
-        covmat = (X_ @ np.conj(X_.swapaxes(1, 2))) * (1. / n_frames)
+    # compute the cov mat (n_freq, n_chan, n_chan)
+    X_ = np.transpose(X, [1, 2, 0])
+    covmat = (X_ @ np.conj(X_.swapaxes(1, 2))) * (1. / n_frames)
 
-        # Compute EVD
-        # v.shape == (n_freq, n_chan), w.shape == (n_freq, n_chan, n_chan)
-        v, w = np.linalg.eigh(covmat)
+    # Compute EVD
+    # v.shape == (n_freq, n_chan), w.shape == (n_freq, n_chan, n_chan)
+    v, w = np.linalg.eigh(covmat)
 
-        # Apply dimensionality reduction
-        # new shape: (n_frames, n_freq, n_src)
-        new_X = np.matmul(X.swapaxes(0, 1), np.conj(w[:, :, -n_src:])).swapaxes(0, 1)
-
-    else:
-        new_X = X
+    # Apply dimensionality reduction
+    # new shape: (n_frames, n_freq, n_src)
+    new_X = np.matmul(X.swapaxes(0, 1), np.conj(w[:, :, -n_src:])).swapaxes(0, 1)
 
     return new_X
 
