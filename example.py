@@ -32,7 +32,7 @@ from five import five
 
 # Get the data if needed
 from get_data import get_data, samples_dir
-from ive import ogive, ogive_matlab_wrapper
+from ive import ogive
 from mir_eval.separation import bss_eval_sources
 from overiva import overiva
 from pyroomacoustics.bss import projection_back
@@ -251,10 +251,13 @@ if __name__ == "__main__":
             axis=0,
         )
 
-    SDR, SIR, cost_func = [], [], []
+    SDR, SIR, eval_time = [], [], []
 
     def convergence_callback(Y, **kwargs):
         global SDR, SIR, ref
+
+        t_enter = time.perf_counter()
+
         from mir_eval.separation import bss_eval_sources
 
         # projection back
@@ -279,10 +282,8 @@ if __name__ == "__main__":
         SDR.append(sdr)
         SIR.append(sir)
 
-    cost = []
-
-    def cost_callback(c):
-        cost.append(c)
+        t_exit = time.perf_counter()
+        eval_time.append(t_exit - t_enter)
 
     if args.algo.startswith("ogive"):
         callback_checkpoints = list(range(0, ogive_iter, ogive_iter // n_iter))
@@ -368,7 +369,6 @@ if __name__ == "__main__":
             init_eig=(args.init == init_choices[1]),
             callback=convergence_callback,
             callback_checkpoints=callback_checkpoints,
-            cost_callback=cost_callback,
         )
     else:
         raise ValueError("No such algorithm {}".format(args.algo))
@@ -379,7 +379,10 @@ if __name__ == "__main__":
 
     toc = time.perf_counter()
 
-    print("Processing time: {} s".format(toc - tic))
+    tot_eval_time = sum(eval_time)
+
+    print("Processing time: {} s".format(toc - tic - tot_eval_time))
+    print("Evaluation time: {} s".format(tot_eval_time))
 
     # Run iSTFT
     if Y.shape[2] == 1:

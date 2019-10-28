@@ -65,7 +65,7 @@ def one_loop(args):
     from five import five
     from ive import ogive
     from overiva import overiva
-    from projection_back import projection_back, sparse_projection_back
+    from pyroomacoustics.bss.common import projection_back
     from room_builder import callback_noise_mixer, random_room_builder
 
     # import samples helper routine
