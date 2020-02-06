@@ -99,13 +99,6 @@ def five(
     def tensor_H(A):
         return np.conj(A.swapaxes(1, 2))
 
-    def cost(Y, X, W):
-        _, logdet = np.linalg.slogdet(W)
-        target = np.sum(np.linalg.norm(Y[:, 0, :], axis=0)) / n_frames
-        background = np.sum(np.linalg.norm(W[:, 1:, :] @ X, axis=1) ** 2) / n_frames
-
-        return -2 * np.sum(logdet) + target + background
-
     # default to determined case
     n_src = 1
 
@@ -119,23 +112,6 @@ def five(
     e_val, e_vec = np.linalg.eigh(Cx)
     Q_H = e_vec[:, :, ::-1] * np.sqrt(e_val[:, None, ::-1])
 
-    W_hat = np.zeros((n_freq, n_chan, n_chan), dtype=X.dtype)
-    W = W_hat[:, :n_src, :]
-
-    # initialize A and W
-    if W0 is None:
-        # We only need to initialize the target demixing
-        # vector in IVE
-        if init_eig:
-            # initialize with leading eigenvector
-            _, w = np.linalg.eigh(Cx)
-            W_hat[:, 0, :] = np.conj(w[:, :, -1])
-        else:
-            # with identity
-            W_hat[:, 0, 0] = 1.0
-    else:
-        W[:, :, :] = W0
-
     eps = 1e-10
     V = np.zeros((n_freq, n_chan, n_chan), dtype=X.dtype)
     r_inv = np.zeros((n_src, n_frames))
@@ -147,13 +123,15 @@ def five(
     # pre-whiten the input signal
     X = np.linalg.solve(Q_H, X.transpose([1, 2, 0]))
 
-    # Compute the demixed output
-    def demix(Y, X, W):
-        Y[:, :, :] = np.matmul(W, X)
+    # initialize the output signal
+    if init_eig:
+        # Principal component
+        Y = X[:, :1, :].copy()
+    else:
+        # First microphone
+        Y = X_original[:, :, :1].transpose([1, 2, 0]).copy()
 
     for epoch in range(n_iter):
-
-        demix(Y, X, W)
 
         if callback is not None and epoch in callback_checkpoints:
             Y_tmp = Y.transpose([2, 0, 1])
@@ -162,9 +140,6 @@ def five(
                 callback(Y_tmp * np.conj(z[None, :, :]))
             else:
                 callback(Y_tmp)
-        if cost_callback is not None and epoch in callback_checkpoints:
-            cost_callback(cost(Y, X, W_hat))
-            pass
 
         # Update now the demixing matrix
 
@@ -187,10 +162,13 @@ def five(
         # so we could solve this more efficiently, but it is faster to
         # just solve everything rather than wrap this in a for loop
         lambda_, R = np.linalg.eigh(V)
-        # Eigenvalues are in ascending order
-        W_hat[:, 0, :] = np.conj(R[:, :, 0]) / np.sqrt(lambda_[:, 0, None])
 
-    demix(Y, X, W)
+        # Update the output signal
+        # note: eigenvalues are in ascending order, we use the smallest
+        Y[:, :, :] = np.matmul(np.conj(R[:, :, :1]).transpose([0, 2, 1]) / np.sqrt(lambda_[:, None, :1]), X)
+
+        if return_filters and epoch == n_iter - 1:
+            W = R
 
     Y = Y.transpose([2, 0, 1]).copy()
 
@@ -199,6 +177,6 @@ def five(
         Y *= np.conj(z[None, :, :])
 
     if return_filters:
-        return Y, W
+        return Y, W @ np.linalg.inv(Q_H)
     else:
         return Y
