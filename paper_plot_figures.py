@@ -331,8 +331,10 @@ if __name__ == "__main__":
     # plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.xticks([60, 180, 300, 420, 540])
     plt.gca().yaxis.set_major_locator(MaxNLocator(integer=True))
-    fig_fn = os.path.join(fig_dir, f"figure1_rt60_hist.pdf")
-    plt.savefig(fig_fn, bbox_inches="tight")
+
+    for ext in ["pdf", "png"]:
+        fig_fn = os.path.join(fig_dir, f"figure1_rt60_hist.{ext}")
+        plt.savefig(fig_fn, bbox_inches="tight")
     plt.close()
 
     # Fourth figure
@@ -359,8 +361,10 @@ if __name__ == "__main__":
     leg.get_frame().set_linewidth(0.2)
     plt.ylabel("Pr(\u0394SIR $\geq$ 1 dB)")
     sns.despine(offset=10, trim=False, left=True, bottom=True)
-    fig_fn = os.path.join(fig_dir, f"figure4_success_mics{n_mics}_sinr{sinr}.pdf")
-    plt.savefig(fig_fn, bbox_inches="tight", bbox_extra_artists=[leg])
+
+    for ext in ["pdf", "png"]:
+        fig_fn = os.path.join(fig_dir, f"figure4_success_mics{n_mics}_sinr{sinr}.{ext}")
+        plt.savefig(fig_fn, bbox_inches="tight", bbox_extra_artists=[leg])
     plt.close()
 
     # Second figure
@@ -392,8 +396,9 @@ if __name__ == "__main__":
     g.map(plt.plot, "Runtime [s]", "value", markersize=1.5)
     g.despine(left=True).set_ylabels("\u0394SDR [dB]").add_legend(fontsize="x-small")
 
-    fig_fn = os.path.join(fig_dir, f"figure2_conv_interf{n_interferers}_sinr{sinr}.pdf")
-    plt.savefig(fig_fn, bbox_inches="tight")
+    for ext in ["pdf", "png"]:
+        fig_fn = os.path.join(fig_dir, f"figure2_conv_interf{n_interferers}_sinr{sinr}.{ext}")
+        plt.savefig(fig_fn, bbox_inches="tight")
     plt.close()
 
     # Third figure
@@ -483,10 +488,11 @@ if __name__ == "__main__":
         g_ax.set_ylabel(lbl)
     """
 
-    fig_fn = os.path.join(
-        fig_dir, f"figure3_{m_name}_interf{n_interferers}_sinr{sinr}.pdf"
-    )
-    plt.savefig(fig_fn, bbox_extra_artists=all_artists, bbox_inches="tight")
+    for ext in ["pdf", "png"]:
+        fig_fn = os.path.join(
+            fig_dir, f"figure3_{m_name}_interf{n_interferers}_sinr{sinr}.{ext}"
+        )
+        plt.savefig(fig_fn, bbox_extra_artists=all_artists, bbox_inches="tight")
     plt.close()
 
     if plot_flag:
