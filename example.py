@@ -22,30 +22,32 @@ Overdetermined Blind Source Separation offline example
 
 This script requires the `mir_eval` to run, and `tkinter` and `sounddevice` packages for the GUI option.
 """
+import os
 import sys
 import time
+from pathlib import Path
 
 import matplotlib
 import numpy as np
+from mir_eval.separation import bss_eval_sources
+from scipy.io import wavfile
+
 from auxiva_pca import auxiva_pca
 from five import five
-
 # Get the data if needed
 from get_data import get_data, samples_dir
 from ive import ogive
-from mir_eval.separation import bss_eval_sources
 from overiva import overiva
 from pyroomacoustics.bss import projection_back
-from routines import PlaySoundGUI, grid_layout, random_layout, semi_circle_layout
-from scipy.io import wavfile
-
-get_data()
+from routines import (PlaySoundGUI, grid_layout, random_layout,
+                      semi_circle_layout)
 from samples.generate_samples import sampling, wav_read_center
 
 # Once we are sure the data is there, import some methods
 # to select and read samples
 sys.path.append(samples_dir)
 
+SEP_SAMPLES_DIR = Path("separation_samples")
 
 # We concatenate a few samples to make them long enough
 if __name__ == "__main__":
@@ -97,6 +99,15 @@ if __name__ == "__main__":
         help="Creates a small GUI for easy playback of the sound samples",
     )
     parser.add_argument(
+        "--no_plot", action="store_true", help="Do not plot anything",
+    )
+    parser.add_argument(
+        "--sinr", default=5, type=int, help="Signal-to-Interference-and-Noise Ratio",
+    )
+    parser.add_argument(
+        "--seed", default=7284023459, type=int, help="Seed for the simulation",
+    )
+    parser.add_argument(
         "--save",
         action="store_true",
         help="Saves the output of the separation to wav files",
@@ -127,13 +138,13 @@ if __name__ == "__main__":
     use_real_R = False
 
     # fix the randomness for repeatability
-    np.random.seed(30)
+    np.random.seed(args.seed)
 
     # set the source powers, the first one is half
     source_std = np.ones(n_sources_target)
     source_std[0] /= np.sqrt(2.0)
 
-    SINR = 5  # signal-to-interference-and-noise ratio
+    SINR = args.sinr  # signal-to-interference-and-noise ratio
     SINR_diffuse_ratio = 0.9999  # ratio of uncorrelated to diffuse noise
 
     # STFT parameters
@@ -161,13 +172,17 @@ if __name__ == "__main__":
     )
     # interferer_locs = grid_layout([3., 5.5], n_sources - n_sources_target, offset=[6.5, 1., 1.7])
     interferer_locs = random_layout(
-        [3.0, 5.5, 1.5], n_sources - n_sources_target, offset=[6.5, 1.0, 0.5], seed=1234
+        [3.0, 5.5, 1.5], n_sources - n_sources_target, offset=[6.5, 1.0, 0.5],
     )
     source_locs = np.concatenate((target_locs, interferer_locs), axis=1)
 
     # Prepare the signals
     wav_files = sampling(
-        1, n_sources, f"{samples_dir}/metadata.json", gender_balanced=True, seed=2222
+        1,
+        n_sources,
+        f"{samples_dir}/metadata.json",
+        gender_balanced=True,
+        seed=args.seed,
     )[0]
     signals = wav_read_center(wav_files, seed=123)
 
@@ -237,7 +252,7 @@ if __name__ == "__main__":
 
     # reference is taken at microphone 0
     ref = np.vstack(
-            [separate_recordings[0, :1], np.sum(separate_recordings[1:, :1], axis=0)]
+        [separate_recordings[0, :1], np.sum(separate_recordings[1:, :1], axis=0)]
     )
 
     SDR, SIR, eval_time = [], [], []
@@ -272,7 +287,9 @@ if __name__ == "__main__":
         eval_time.append(t_exit - t_enter)
 
     if args.algo.startswith("ogive"):
-        callback_checkpoints = list(range(1, ogive_iter + ogive_iter // n_iter, ogive_iter // n_iter))
+        callback_checkpoints = list(
+            range(1, ogive_iter + ogive_iter // n_iter, ogive_iter // n_iter)
+        )
     else:
         callback_checkpoints = list(range(1, n_iter + 1))
     if args.no_cb:
@@ -386,43 +403,54 @@ if __name__ == "__main__":
     print(f"SDR: In: {SDR[0, 0]:6.2f} dB -> Out: {SDR[-1, 0]:6.2f} dB")
     print(f"SIR: In: {SIR[0, 0]:6.2f} dB -> Out: {SIR[-1, 0]:6.2f} dB")
 
-    import matplotlib.pyplot as plt
+    if not args.no_plot:
+        import matplotlib.pyplot as plt
 
-    plt.figure()
+        plt.figure()
 
-    plt.subplot(2, 1, 1)
-    plt.specgram(mics_signals[0], NFFT=1024, Fs=room.fs)
-    plt.title("Microphone 0 input")
+        plt.subplot(2, 1, 1)
+        plt.specgram(mics_signals[0], NFFT=1024, Fs=room.fs)
+        plt.title("Microphone 0 input")
 
-    plt.subplot(2, 1, 2)
-    plt.specgram(y_hat[:, 0], NFFT=1024, Fs=room.fs)
-    plt.title("Extracted source")
+        plt.subplot(2, 1, 2)
+        plt.specgram(y_hat[:, 0], NFFT=1024, Fs=room.fs)
+        plt.title("Extracted source")
 
-    plt.tight_layout(pad=0.5)
+        plt.tight_layout(pad=0.5)
 
-    plt.figure()
-    plt.plot([0] + callback_checkpoints, SDR[:, 0], label="SDR", marker="*")
-    plt.plot([0] + callback_checkpoints, SIR[:, 0], label="SIR", marker="o")
-    plt.legend()
-    plt.tight_layout(pad=0.5)
+        if not args.no_cb:
+            plt.figure()
+            plt.plot([0] + callback_checkpoints, SDR[:, 0], label="SDR", marker="*")
+            plt.plot([0] + callback_checkpoints, SIR[:, 0], label="SIR", marker="o")
+            plt.legend()
+            plt.tight_layout(pad=0.5)
 
-    if not args.gui:
-        plt.show()
-    else:
-        plt.show(block=False)
+        if not args.gui:
+            plt.show()
+        else:
+            plt.show(block=False)
 
     if args.save:
-        wavfile.write(
-            "bss_iva_mix.wav",
-            room.fs,
-            pra.normalize(mics_signals[0, :], bits=16).astype(np.int16),
+
+        scale = (0.95 * (2 ** 15)) / np.max(
+            [np.abs(s).max() for s in [mics_signals[0, :], ref, y_hat]]
         )
-        for i, sig in enumerate(y_hat):
+
+        if not SEP_SAMPLES_DIR.exists():
+            os.mkdir(SEP_SAMPLES_DIR)
+
+        def wavsave(type_, fs, audio):
             wavfile.write(
-                "bss_iva_source{}.wav".format(i + 1),
-                room.fs,
-                pra.normalize(sig, bits=16).astype(np.int16),
+                SEP_SAMPLES_DIR
+                / f"sample_{SINR}_{args.seed}_{args.algo}_{args.dist}_{n_mics}_{type_}.wav",
+                fs,
+                (scale * audio).astype(np.int16),
             )
+
+        wavsave("mix", room.fs, mics_signals[0])
+        wavsave("ref", room.fs, ref[0])
+        for i, sig in enumerate(y_hat.T):
+            wavsave(f"source{i}", room.fs, sig)
 
     if args.gui:
 

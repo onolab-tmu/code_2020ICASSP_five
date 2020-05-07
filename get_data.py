@@ -21,6 +21,7 @@
 This script can be used to download the data used in the experiments.
 """
 import os
+
 from pyroomacoustics.datasets.utils import download_uncompress
 
 url_data = "https://zenodo.org/record/3066489/files/cmu_arctic_concat15.tar.gz"
@@ -30,7 +31,11 @@ samples_dir = "./samples"
 
 def get_data():
     if os.path.exists(samples_dir):
-        print("The samples directory " f"{samples_dir}" " seems to exist already. Delete if re-download is needed.")
+        print(
+            "The samples directory "
+            f"{samples_dir}"
+            " seems to exist already. Delete if re-download is needed."
+        )
     else:
         print("Downloading the samples... ", end="")
         download_uncompress(url_data, temp_dir)
@@ -41,5 +46,7 @@ def get_data():
         print("done.")
 
 
+get_data()
+
 if __name__ == "__main__":
-    get_data()
+    pass
